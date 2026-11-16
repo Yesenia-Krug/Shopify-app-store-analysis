@@ -24,3 +24,46 @@ Fix the $20–$49 Value Gap: For apps sitting in that mid-tier price bracket, we
 Double Down on High-Satisfaction Niches: Let's focus our upcoming roadmap on Productivity and Sales & Conversion features where the user sentiment is already backing us up.
 
 Push for Freemium/Trials: If we're working with developers or building out new pricing models, we should strongly advocate for structured free trials or freemium entry points—the data shows it's the easiest way to pull in volume and lower acquisition friction.
+
+## Data-Cleaning & Reconciliation
+
+All data transformations are executed in Power Query prior to loading into the star schema model:
+
+* **Developer Name Standardization:** Null values, empty strings (`""`), and whitespace-only entries in the developer field were replaced with `"Unknown Developer"` to prevent blank slicer groupings.
+* **Date Normalization:** Mixed regional date formats (e.g., `MM/DD/YYYY` vs. `DD-MM-YYYY` and text strings) were standardized using locale-aware parsing (`en-US` / `en-GB` culture rules) and converted to a uniform `Date` type before linking to `dim_date`.
+* **Deduplication & Filtering:** Exact duplicate review IDs and corrupted rows missing critical primary keys were removed.
+
+### Record Count Reconciliation
+| Pipeline Stage | Record Count | Variance | Notes |
+| :--- | :---: | :---: | :--- |
+| **Raw Source Extract** | 8,240 | — | Initial export from source repository |
+| **Removed Duplicates** | -240 | -2.9% | Duplicate `review_id` entries dropped |
+| **Removed Malformed Rows** | 0 | -0.0% | Rows missing valid timestamps or app IDs |
+| **Final Cleaned Dataset** | **8,000** | **-2.9%** | Loaded into fact table (`fact_reviews`) |
+
+## KPI Definitions
+
+All time-based calculations rely exclusively on the dedicated `dim_date` table (`dim_date[Date]`) to ensure continuous date filtering.
+
+| Metric | Definition / Business Logic | DAX Formula Overview |
+| :--- | :--- | :--- |
+| **Total Reviews** | Total count of valid reviews in the cleaned dataset. | `COUNTROWS(fact_reviews)` |
+| **Developer Reply %** | Percentage of total reviews that received an official developer response. | `DIVIDE([Replied Reviews], [Total Reviews], 0)` |
+| **Reviews YoY %** | Year-over-year percentage growth in review volume compared to the same period in the prior year. | `DIVIDE([Total Reviews] - [Reviews PY], [Reviews PY])` |
+| **Average Rating** | Mean star rating (1–5 scale) across selected apps or categories. | `AVERAGE(fact_reviews[rating])` |
+
+## Refresh & Maintenance Instructions
+
+### Routine Data Refresh
+1. **Update Source Files:** Place updated `apps.csv` and `reviews.csv` exports into the designated `/data/raw/` directory (or verify file path parameters in Power Query via **Transform data > Data source settings**).
+2. **Power BI Desktop Refresh:** Open `Shopify_App_Store_Performance.pbix` (or your project `.pbix` file) and select **Home > Refresh**. Verify that Power Query executes without errors—specifically ensuring mixed date formats in `reviews.csv` (`YYYY-MM-DD` and `MM/DD/YYYY`) parse cleanly and missing values in `apps.csv[developer]` map to `"Unknown Developer"`.
+3. **Verify Reconciliation:** Confirm that the loaded row counts match expected post-cleaning baselines:
+   * `dim_apps` (`apps.csv`): **500** unique apps (with 25 imputed `"Unknown Developer"` records).
+   * `fact_reviews` (`reviews.csv`): **8,000** deduplicated reviews (accounting for the removal of 240 duplicate `review_id` rows from the 8,240 raw records).
+4. **Publish:** Save and publish the updated `.pbix` file to the Power BI Service workspace and confirm scheduled refresh credentials if connected to a cloud/gateway source.
+
+### Maintenance & Version Control Guidelines
+* **Schema & Date Table (`dim_date`):** Never use native date columns (`reviews[posted_at]` or `apps[launch_date]`) directly in visuals or DAX time-intelligence functions; always map relationships and calculations through `dim_date[Date]`. The current dataset spans **January 14, 2018** (earliest app launch) through **December 30, 2024** (latest review)—if future exports include 2025+ records, extend the `dim_date` range accordingly.
+* **Chronological Sorting:** Ensure `dim_date[Month Name]` remains explicitly sorted by `dim_date[Month Number]` (1–12) via **Column tools > Sort by column** so Time Intelligence visuals display months chronologically rather than alphabetically.
+* **Visual Defaults:** Before saving and publishing updates, verify that all page-level and report-level category filters on the **Overview** page are cleared so the default landing view displays aggregated app store performance across all categories.
+* **Measure Formatting:** Any newly added ratio or growth measures (such as `Developer Reply %` and `Reviews YoY %`) must be explicitly formatted as **Percentage (`0.0%`)** in the **Measure tools** ribbon rather than left as raw decimals.

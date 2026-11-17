@@ -59,7 +59,7 @@ All time-based calculations rely exclusively on the dedicated `dim_date` table (
 2. **Power BI Desktop Refresh:** Open `Shopify_App_Store_Performance.pbix` (or your project `.pbix` file) and select **Home > Refresh**. Verify that Power Query executes without errors—specifically ensuring mixed date formats in `reviews.csv` (`YYYY-MM-DD` and `MM/DD/YYYY`) parse cleanly and missing values in `apps.csv[developer]` map to `"Unknown Developer"`.
 3. **Verify Reconciliation:** Confirm that the loaded row counts match expected post-cleaning baselines:
    * `dim_apps` (`apps.csv`): **500** unique apps (with 25 imputed `"Unknown Developer"` records).
-   * `fact_reviews` (`reviews.csv`): **8,000** deduplicated reviews (accounting for the removal of 240 duplicate `review_id` rows from the 8,240 raw records).
+   * `fact_reviews` (`reviews.csv`): **7,980** deduplicated reviews (accounting for the removal of 240 duplicate `review_id` rows from the 8,240 raw records).
 4. **Publish:** Save and publish the updated `.pbix` file to the Power BI Service workspace and confirm scheduled refresh credentials if connected to a cloud/gateway source.
 
 ### Maintenance & Version Control Guidelines
